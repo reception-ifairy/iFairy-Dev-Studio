@@ -1,1 +1,55 @@
+name: CodeAgent Runner
 
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'Tekst promptu wysyłany z DevStudio'
+        required: false
+      source:
+        description: 'Źródło (np. experimental)'
+        required: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: codeagent-runner
+      cancel-in-progress: true
+    env:
+      NODE_OPTIONS: --unhandled-rejections=strict
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Display environment
+        run: |
+          echo "Received prompt: ${{ github.event.inputs.prompt }}"
+          echo "Source: ${{ github.event.inputs.source }}"
+          echo "GitHub ref: $GITHUB_REF"
+          node -v
+          npm -v
+
+      - name: Setup PHP & Composer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y php-cli composer
+          php -v
+          composer --version
+
+      - name: Run build helpers
+        run: |
+          echo '{"status":"ok","run_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}' > agent-output.json
+          echo "Prompt summary:" >> agent-output.json
+          echo "$([[ -n "${{ github.event.inputs.prompt }}" ]] && echo "${{ github.event.inputs.prompt }}" || echo "<brak>" )" >> agent-output.json
+
+      - name: Upload CI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeagent-output
+          path: agent-output.json
